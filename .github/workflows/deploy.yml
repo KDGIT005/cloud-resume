@@ -3,7 +3,7 @@ name: Deploy Cloud Resume
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -37,13 +37,13 @@ jobs:
           terraform plan -var-file=terraform.tfvars
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         run: |
           cd terraform
           terraform apply -var-file=terraform.tfvars -auto-approve
 
       - name: Export Terraform Outputs
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         id: terraform-outputs
         run: |
           cd terraform
@@ -77,4 +77,4 @@ jobs:
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ needs.deploy-infrastructure.outputs.cloudfront_id }} --paths "/*" 
+          aws cloudfront create-invalidation --distribution-id ${{ needs.deploy-infrastructure.outputs.cloudfront_id }} --paths "/*"
