@@ -1,0 +1,80 @@
+name: Deploy Cloud Resume
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy AWS Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform
+          terraform plan -var-file=terraform.tfvars
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd terraform
+          terraform apply -var-file=terraform.tfvars -auto-approve
+
+      - name: Export Terraform Outputs
+        if: github.ref == 'refs/heads/main'
+        id: terraform-outputs
+        run: |
+          cd terraform
+          BUCKET_NAME=$(terraform output -raw website_bucket_name)
+          CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id)
+          echo "::set-output name=bucket_name::$BUCKET_NAME"
+          echo "::set-output name=cloudfront_id::$CLOUDFRONT_ID"
+
+    outputs:
+      bucket_name: ${{ steps.terraform-outputs.outputs.bucket_name }}
+      cloudfront_id: ${{ steps.terraform-outputs.outputs.cloudfront_id }}
+
+  deploy-website:
+    name: Deploy Website Files
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload website to S3
+        run: |
+          aws s3 sync website/ s3://${{ needs.deploy-infrastructure.outputs.bucket_name }} --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ needs.deploy-infrastructure.outputs.cloudfront_id }} --paths "/*" 
