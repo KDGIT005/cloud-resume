@@ -1,7 +1,0 @@
-aws_region        = "us-east-1"
-bucket_name       = "my-cloud-resume-bucket"
-use_custom_domain = false
-# If you want to use a custom domain, uncomment and fill in the following:
-# use_custom_domain = true
-# domain_name       = "resume.example.com"
-# certificate_arn   = "arn:aws:acm:us-east-1:123456789012:certificate/your-certificate-id" 
